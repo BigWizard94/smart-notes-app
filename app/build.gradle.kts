@@ -40,6 +40,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     
-    // Google Gemini AI SDK
-    implementation("com.google.ai.client.generativeai:generativeai:0.2.2")
+    // Google Gemini AI SDK updated to latest version
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 }
