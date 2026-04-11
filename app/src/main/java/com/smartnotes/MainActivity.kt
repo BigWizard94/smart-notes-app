@@ -15,9 +15,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Put your Gemini API Key here (from Google AI Studio)
+        // Updated to the newest 2.5 Flash model!
         val generativeModel = GenerativeModel(
-            modelName = "gemini-1.5-flash",
+            modelName = "gemini-2.5-flash",
             apiKey = "AIzaSyCiPRkONlJpNVAYkexKWd68_lXXrjm3o9k" 
         )
 
