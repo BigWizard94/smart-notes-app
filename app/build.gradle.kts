@@ -42,4 +42,5 @@ dependencies {
     
     // Google Gemini AI SDK updated to latest version
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+implementation("androidx.datastore:datastore-preferences:1.0.0")
 }
