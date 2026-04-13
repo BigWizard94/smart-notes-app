@@ -4,13 +4,24 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen() {
-    var baseUrl by remember { mutableStateOf("https://api.openai.com/v1/chat/completions") }
-    var modelName by remember { mutableStateOf("gpt-4o") }
-    var apiKey by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    val scope = rememberCoroutineScope()
+
+    // Read the currently saved values so the text boxes aren't empty when opened
+    val savedBaseUrl by settingsManager.baseUrlFlow.collectAsState(initial = "")
+    val savedModelName by settingsManager.modelNameFlow.collectAsState(initial = "")
+    val savedApiKey by settingsManager.apiKeyFlow.collectAsState(initial = "")
+
+    var baseUrl by remember(savedBaseUrl) { mutableStateOf(savedBaseUrl) }
+    var modelName by remember(savedModelName) { mutableStateOf(savedModelName) }
+    var apiKey by remember(savedApiKey) { mutableStateOf(savedApiKey) }
 
     Column(modifier = Modifier.padding(16.dp).fillMaxSize()) {
         Text("AI Provider Settings", style = MaterialTheme.typography.headlineMedium)
@@ -48,7 +59,10 @@ fun SettingsScreen() {
 
         Button(
             onClick = { 
-                // DataStore save logic goes here
+                // FIRE THE DATASTORE SAVE EVENT!
+                scope.launch {
+                    settingsManager.saveSettings(baseUrl, modelName, apiKey)
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -56,4 +70,3 @@ fun SettingsScreen() {
         }
     }
 }
-
