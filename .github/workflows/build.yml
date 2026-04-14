@@ -28,7 +28,7 @@ jobs:
       run: gradle assembleRelease
 
     - name: Install Stubborn Build Tools
-      run: sdkmanager "build-tools;29.0.3"
+      run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3"
 
     - name: Sign APK
       uses: r0adkll/sign-android-release@v1
