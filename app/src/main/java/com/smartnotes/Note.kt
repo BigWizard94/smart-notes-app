@@ -1,8 +1,14 @@
 package com.smartnotes
 
-// This is the foundational blueprint for our internal database
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+// @Entity tells Room to turn this exact blueprint into a database table
+@Entity(tableName = "notes_table")
 data class Note(
-    val id: Long = System.currentTimeMillis(), // Generates a unique ID based on the exact millisecond it is saved
+    // @PrimaryKey tells Room to automatically give every note a unique ID number
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
     val originalText: String,
     val aiResponse: String,
     val timestamp: Long = System.currentTimeMillis()
