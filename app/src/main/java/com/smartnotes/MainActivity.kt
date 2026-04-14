@@ -173,7 +173,7 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-        HorizontalDivider()
+        Divider()
         Spacer(modifier = Modifier.height(16.dp))
 
         // NEW: The Vault Display
