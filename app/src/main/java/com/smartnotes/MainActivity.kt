@@ -1,8 +1,11 @@
 package com.smartnotes
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.launch
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -26,7 +30,6 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val settingsManager = remember { SettingsManager(context) }
                 
-                // NEW: Wake up the database engine!
                 val database = remember { NoteDatabase.getDatabase(context) }
                 val noteDao = database.noteDao()
                 
@@ -58,7 +61,7 @@ class MainActivity : ComponentActivity() {
                             )
                             SmartNotesScreen(
                                 generativeModel = generativeModel,
-                                noteDao = noteDao, // Pass the engine into our screen
+                                noteDao = noteDao,
                                 onOpenSettings = { currentScreen = "settings" }
                             )
                         }
@@ -84,10 +87,38 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
     var note by remember { mutableStateOf("") }
     var aiResponse by remember { mutableStateOf("AI Assistant is ready.") }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     
-    // NEW: Live-observe the vault. If the database changes, this updates the screen instantly!
     val savedNotes by noteDao.getAllNotes().collectAsState(initial = emptyList())
     val scrollState = rememberScrollState()
+
+    // NEW: The Android File Saver Launcher!
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                try {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                        OutputStreamWriter(outputStream).use { writer ->
+                            writer.write("SMART NOTES VAULT EXPORT\n")
+                            writer.write("========================\n\n")
+                            savedNotes.forEach { savedNote ->
+                                val dateString = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(savedNote.timestamp))
+                                writer.write("Date: $dateString\n")
+                                writer.write("Original: ${savedNote.originalText}\n")
+                                writer.write("AI: ${savedNote.aiResponse}\n")
+                                writer.write("------------------------\n\n")
+                            }
+                        }
+                    }
+                    Toast.makeText(context, "Vault Exported to Phone!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Export Failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
 
     Column(modifier = Modifier
         .padding(16.dp)
@@ -154,14 +185,13 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // NEW: The Save Button!
         Button(
             onClick = {
                 scope.launch {
                     if (note.isNotBlank()) {
                         val newNote = Note(originalText = note, aiResponse = aiResponse)
-                        noteDao.insertNote(newNote) // Fires it into the database!
-                        note = "" // Clears the text box so you can write a new one
+                        noteDao.insertNote(newNote)
+                        note = ""
                         aiResponse = "Saved to Vault!"
                     }
                 }
@@ -176,8 +206,22 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         Divider()
         Spacer(modifier = Modifier.height(16.dp))
 
-        // NEW: The Vault Display
-        Text("Saved Vault", style = MaterialTheme.typography.headlineSmall)
+        // NEW: Vault Header with the Export Button side-by-side
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Saved Vault", style = MaterialTheme.typography.headlineSmall)
+            
+            Button(
+                onClick = { exportLauncher.launch("SmartNotes_Backup.txt") },
+                enabled = savedNotes.isNotEmpty() // Button is disabled if the vault is empty!
+            ) {
+                Text("Export to Phone")
+            }
+        }
+        
         Spacer(modifier = Modifier.height(8.dp))
         
         if (savedNotes.isEmpty()) {
@@ -186,7 +230,6 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
             savedNotes.forEach { savedNote ->
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        // Format the timestamp into a readable date
                         val dateString = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(savedNote.timestamp))
                         Text(dateString, style = MaterialTheme.typography.labelSmall)
                         Spacer(modifier = Modifier.height(4.dp))
@@ -195,7 +238,6 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("AI: ${savedNote.aiResponse}", style = MaterialTheme.typography.bodySmall)
                         
-                        // Delete button for individual notes
                         Button(
                             onClick = { scope.launch { noteDao.deleteNote(savedNote) } },
                             modifier = Modifier.align(Alignment.End),
