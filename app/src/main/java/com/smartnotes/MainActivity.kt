@@ -231,4 +231,4 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
                                 // Send the data in the background so the app doesn't freeze
                                 withContext(Dispatchers.IO) {
                                     val client = OkHttpClient()
-                                    val credential = Credentials.basic("bigwizardmedia", "Kd57n-Tt5X4-GMYw2-
+                                    val credential = Credentials.basic("bigwizardmedia", "Kd57n-Tt5X4-GMYw2-wMF7d-Jqgtg")
