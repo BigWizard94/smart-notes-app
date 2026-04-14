@@ -125,7 +125,7 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         }
     }
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxSize().verticalScroll(scrollState)) {
+Column(modifier = Modifier.padding(16.dp).fillMaxSize().verticalScroll(scrollState)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -155,7 +155,7 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
                     } catch (e: Exception) { aiResponse = "Error: ${e.localizedMessage}" }
                 }
             }) { Text("Organize") }
-9
+
             Button(onClick = {
                 scope.launch {
                     aiResponse = "Summarizing..."
@@ -200,7 +200,6 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         Divider()
         Spacer(modifier = Modifier.height(16.dp))
 
-        // NEW: Dual Export/Sync Buttons!
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -216,7 +215,6 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                // THE WEBDAV SYNC BUTTON
                 Button(
                     onClick = {
                         scope.launch {
@@ -228,7 +226,78 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
                                     exportText += "Date: $dateString\nOriginal: ${savedNote.originalText}\nAI: ${savedNote.aiResponse}\n------------------------\n\n"
                                 }
 
-                                // Send the data in the background so the app doesn't freeze
                                 withContext(Dispatchers.IO) {
                                     val client = OkHttpClient()
                                     val credential = Credentials.basic("bigwizardmedia", "Kd57n-Tt5X4-GMYw2-wMF7d-Jqgtg")
+                                    val requestBody = exportText.toRequestBody("text/plain".toMediaTypeOrNull())
+                                    
+                                    val request = Request.Builder()
+                                        .url("https://murena.io/remote.php/webdav/SmartNotes_Backup.txt")
+                                        .put(requestBody)
+                                        .header("Authorization", credential)
+                                        .build()
+
+                                    client.newCall(request).execute().use { response ->
+                                        if (!response.isSuccessful) throw Exception("Server rejected: ${response.code}")
+                                    }
+                                }
+                                Toast.makeText(context, "Cloud Sync Complete!", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Sync Error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    },
+                    enabled = savedNotes.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+                ) { Text("Cloud") }
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (savedNotes.isNotEmpty()) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Search vault...") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        
+        if (filteredNotes.isEmpty() && savedNotes.isNotEmpty()) {
+            Text("No notes match your search.", style = MaterialTheme.typography.bodyMedium)
+        } else if (savedNotes.isEmpty()) {
+            Text("Your vault is currently empty.", style = MaterialTheme.typography.bodyMedium)
+        } else {
+            filteredNotes.forEach { savedNote ->
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        val dateString = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(savedNote.timestamp))
+                        Text(dateString, style = MaterialTheme.typography.labelSmall)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text("Original: ${savedNote.originalText}", style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("AI: ${savedNote.aiResponse}", style = MaterialTheme.typography.bodySmall)
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = {
+                                clipboardManager.setText(AnnotatedString(savedNote.aiResponse))
+                                Toast.makeText(context, "Copied AI Response!", Toast.LENGTH_SHORT).show()
+                            }) { Text("Copy AI Text") }
+
+                            Button(
+                                onClick = { scope.launch { noteDao.deleteNote(savedNote) } },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                            ) { Text("Delete") }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
