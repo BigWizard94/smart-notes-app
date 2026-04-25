@@ -1,45 +1,27 @@
 package com.smartnotes
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// Extension property to create the DataStore instance safely
-val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ai_settings")
+private val Context.dataStore by preferencesDataStore("settings")
 
 class SettingsManager(private val context: Context) {
-    
-    // Define the keys for our three settings
     companion object {
-        val BASE_URL_KEY = stringPreferencesKey("base_url")
-        val MODEL_NAME_KEY = stringPreferencesKey("model_name")
-        val API_KEY_KEY = stringPreferencesKey("api_key")
+        val API_KEY = stringPreferencesKey("api_key")
+        val MODEL_NAME = stringPreferencesKey("model_name")
+        val OFFLINE_MODE = booleanPreferencesKey("offline_mode")
     }
 
-    // Read the values (Flows will automatically update the UI when changed)
-    val baseUrlFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[BASE_URL_KEY] ?: "https://api.openai.com/v1/chat/completions"
-    }
-    
-    val modelNameFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[MODEL_NAME_KEY] ?: "gpt-4o"
-    }
-    
-    val apiKeyFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[API_KEY_KEY] ?: ""
-    }
+    val apiKeyFlow: Flow<String?> = context.dataStore.data.map { it[API_KEY] }
+    val modelNameFlow: Flow<String?> = context.dataStore.data.map { it[MODEL_NAME] }
+    val offlineModeFlow: Flow<Boolean> = context.dataStore.data.map { it[OFFLINE_MODE] ?: false }
 
-    // Write the values to local storage
-    suspend fun saveSettings(baseUrl: String, modelName: String, apiKey: String) {
-        context.dataStore.edit { preferences ->
-            preferences[BASE_URL_KEY] = baseUrl
-            preferences[MODEL_NAME_KEY] = modelName
-            preferences[API_KEY_KEY] = apiKey
-        }
-    }
+    suspend fun saveApiKey(key: String) { context.dataStore.edit { it[API_KEY] = key } }
+    suspend fun saveModelName(name: String) { context.dataStore.edit { it[MODEL_NAME] = name } }
+    suspend fun saveOfflineMode(isOffline: Boolean) { context.dataStore.edit { it[OFFLINE_MODE] = isOffline } }
 }
