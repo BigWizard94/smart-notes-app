@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("kotlin-kapt")
 }
 
 android {
@@ -56,5 +57,15 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
     implementation("androidx.constraintlayout:constraintlayout-compose:1.0.1")
+
+    // FOSS Universal API Router
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Local Vault Database (Room)
+    implementation("androidx.room:room-runtime:2.5.2")
+    implementation("androidx.room:room-ktx:2.5.2")
+    kapt("androidx.room:room-compiler:2.5.2")
+
+    // Local Settings (DataStore)
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 }
