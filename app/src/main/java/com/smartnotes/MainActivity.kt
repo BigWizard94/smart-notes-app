@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
 }
 
 suspend fun fetchAiResponse(prompt: String, apiKey: String, modelName: String): String = withContext(Dispatchers.IO) {
-    val client = OkHttpClient()
+    val client = OkHttpClient.Builder().connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS).readTimeout(60, java.util.concurrent.TimeUnit.SECONDS).build()
     val isGoogle = apiKey.startsWith("AIza") || modelName.contains("gemini")
     val isGroq = apiKey.startsWith("gsk_")
 
