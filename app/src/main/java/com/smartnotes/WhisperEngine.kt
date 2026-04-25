@@ -6,6 +6,10 @@ import java.io.FileOutputStream
 
 class WhisperEngine(private val context: Context) {
     
+    init {
+        System.loadLibrary("whisper_jni")
+    }
+
     fun initializeBrain() {
         val brainFile = File(context.filesDir, "ggml-tiny.en.bin")
         if (!brainFile.exists()) {
@@ -17,9 +21,5 @@ class WhisperEngine(private val context: Context) {
         }
     }
 
-    // Native C++ Call Placeholder for F-Droid compatibility
-    fun transcribeOffline(audioData: ByteArray): String {
-        // In a full NDK build, this passes the byte array to the whisper.cpp JNI wrapper.
-        return "> [LOCAL WHISPER AI]: Audio processed 100% offline. Zero-knowledge protocols engaged."
-    }
+    external fun transcribeOffline(audioData: ByteArray): String
 }
