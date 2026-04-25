@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -35,8 +35,15 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.google.ai.client.generativeai.GenerativeModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,8 +79,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         } else {
-                            val generativeModel = GenerativeModel(modelName = modelName, apiKey = apiKey)
-                            SmartNotesScreen(generativeModel, noteDao) { currentScreen = "settings" }
+                            SmartNotesScreen(apiKey, modelName, noteDao) { currentScreen = "settings" }
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -91,16 +97,49 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// Lightweight Markdown Parser for Termux/FOSS constraints
+suspend fun fetchAiResponse(prompt: String, apiKey: String, modelName: String): String = withContext(Dispatchers.IO) {
+    val client = OkHttpClient()
+    val isGoogle = apiKey.startsWith("AIza") || modelName.contains("gemini")
+    val isGroq = apiKey.startsWith("gsk_")
+
+    val url = when {
+        isGoogle -> "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+        isGroq -> "https://api.groq.com/openai/v1/chat/completions"
+        else -> "https://api.openai.com/v1/chat/completions"
+    }
+
+    val jsonBody = if (isGoogle) {
+        JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
+    } else {
+        JSONObject().put("model", modelName).put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
+    }
+
+    val requestBuilder = Request.Builder().url(url).post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+    if (!isGoogle) requestBuilder.addHeader("Authorization", "Bearer $apiKey")
+
+    try {
+        val response = client.newCall(requestBuilder.build()).execute()
+        val responseData = response.body?.string() ?: return@withContext "ERROR: Empty response"
+        if (!response.isSuccessful) return@withContext "ERROR: Code ${response.code}\n$responseData"
+
+        val json = JSONObject(responseData)
+        if (isGoogle) {
+            return@withContext json.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
+        } else {
+            return@withContext json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+        }
+    } catch (e: Exception) {
+        return@withContext "NETWORK ERROR: ${e.message}"
+    }
+}
+
 fun formatMarkdown(text: String): AnnotatedString {
     return buildAnnotatedString {
         val boldRegex = "\\*\\*(.*?)\\*\\*".toRegex()
         var lastIndex = 0
         boldRegex.findAll(text).forEach { matchResult ->
             append(text.substring(lastIndex, matchResult.range.first))
-            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) {
-                append(matchResult.groupValues[1])
-            }
+            withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = Color.White)) { append(matchResult.groupValues[1]) }
             lastIndex = matchResult.range.last + 1
         }
         append(text.substring(lastIndex))
@@ -117,15 +156,16 @@ fun CyberpunkTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenSettings: () -> Unit) {
+fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpenSettings: () -> Unit) {
     var note by remember { mutableStateOf("") }
     var aiResponse by remember { mutableStateOf("> AI Assistant standing by...") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val savedNotes by noteDao.getAllNotes().collectAsState(initial = emptyList())
     val scrollState = rememberScrollState()
-
+    
     val whisperEngine = remember { WhisperEngine(context).apply { initializeBrain() } }
+
     val speechRecognizerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0) ?: ""
@@ -144,7 +184,7 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         OutlinedTextField(
             value = note,
             onValueChange = { note = it },
-            label = { Text("INPUT DATA STREAM...", color = Color.Green) },
+            label = { Text("INPUT DATA STREAM / QUERY...", color = Color.Green) },
             modifier = Modifier.fillMaxWidth().height(120.dp).shadow(10.dp, spotColor = Color.Green).border(1.dp, Color.Green, RoundedCornerShape(4.dp)),
             textStyle = androidx.compose.ui.text.TextStyle(color = Color.Green, fontFamily = FontFamily.Monospace),
             colors = TextFieldDefaults.colors(focusedContainerColor = Color(0xFF0A0A0A), unfocusedContainerColor = Color(0xFF0A0A0A), focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent)
@@ -164,8 +204,21 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
         Spacer(modifier = Modifier.height(16.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            OutlinedButton(onClick = { scope.launch { aiResponse = generativeModel.generateContent("Organize this:\n$note").text ?: "ERROR" } }, border = BorderStroke(1.dp, Color.Green), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)) { Text("ORGANIZE", fontFamily = FontFamily.Monospace) }
-            OutlinedButton(onClick = { scope.launch { aiResponse = generativeModel.generateContent("Extract To-Dos:\n$note").text ?: "ERROR" } }, border = BorderStroke(1.dp, Color.Green), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)) { Text("EXTRACT", fontFamily = FontFamily.Monospace) }
+            OutlinedButton(onClick = { scope.launch { aiResponse = fetchAiResponse("Organize this:\n$note", apiKey, modelName) } }, border = BorderStroke(1.dp, Color.Green), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)) { Text("ORGANIZE", fontFamily = FontFamily.Monospace) }
+            OutlinedButton(onClick = { scope.launch { aiResponse = fetchAiResponse("Extract To-Dos:\n$note", apiKey, modelName) } }, border = BorderStroke(1.dp, Color.Green), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)) { Text("EXTRACT", fontFamily = FontFamily.Monospace) }
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        OutlinedButton(
+            onClick = { scope.launch { aiResponse = fetchAiResponse("Act as an AI assistant. Answer this query:\n$note", apiKey, modelName) } }, 
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, Color.Green), 
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)
+        ) { 
+            Icon(Icons.Filled.Search, contentDescription = "Query", tint = Color.Green)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("QUERY AI ARCHIVES", fontFamily = FontFamily.Monospace) 
         }
 
         Spacer(modifier = Modifier.height(16.dp))
