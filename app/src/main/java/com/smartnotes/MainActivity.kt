@@ -125,6 +125,7 @@ fun SmartNotesScreen(generativeModel: GenerativeModel, noteDao: NoteDao, onOpenS
     val savedNotes by noteDao.getAllNotes().collectAsState(initial = emptyList())
     val scrollState = rememberScrollState()
 
+    val whisperEngine = remember { WhisperEngine(context).apply { initializeBrain() } }
     val speechRecognizerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0) ?: ""
