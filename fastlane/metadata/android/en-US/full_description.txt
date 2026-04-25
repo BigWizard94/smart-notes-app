@@ -1,0 +1,12 @@
+Break free from corporate data harvesting and cloud subscriptions. Smart Notes is a 100% open-source, offline-capable productivity vault designed for power users, developers, and privacy advocates. 
+
+Built entirely from a mobile terminal environment, Smart Notes combines a raw hardware audio engine with a completely decentralized AI architecture. Your data, your keys, your rules.
+
+### CORE FEATURES:
+* **Native Offline Voice AI:** Flip the "Local Whisper" toggle to sever all network connections. Smart Notes uses a natively compiled C++ NDK engine to rip raw 16kHz audio straight from your hardware microphone and translate it locally. Zero cloud, zero tracking.
+* **Bring Your Own Key (BYOK) Router:** Stop paying expensive monthly AI subscriptions. Plug in your own API keys for Groq (FOSS models), Google AI Studio, or OpenAI. You only pay fractions of a cent for exactly what you use.
+* **Local Encrypted Vault:** All transcriptions, notes, and AI responses are secured inside a local SQLite Room Database. Your data never leaves your device unless you choose to export it.
+* **Generative Data Extraction:** Instantly command the AI to organize chaotic voice dumps, extract actionable to-dos, or query your previous notes as a personalized AI assistant.
+* **Strictly Open Source:** Licensed under GPL-3.0. No proprietary trackers, no forced telemetry, and no ad SDKs. 
+
+**Developed by Bigwizard Media.** Empowering users with transparent, decentralized, and locally hosted toolkits.
