@@ -1,9 +1,13 @@
 package com.smartnotes
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.speech.RecognizerIntent
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -35,6 +39,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,30 +69,17 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
                     if (currentScreen == "home") {
                         if (apiKey.isBlank()) {
-                            Column(
-                                modifier = Modifier.fillMaxSize().padding(16.dp),
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
+                            Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("> SYSTEM HALTED: API KEY REQUIRED", color = Color.Red, fontFamily = FontFamily.Monospace)
                                 Spacer(modifier = Modifier.height(24.dp))
-                                Button(
-                                    onClick = { currentScreen = "settings" },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Green)
-                                ) {
-                                    Text("CONFIGURE AI PROVIDER", color = Color.Black, fontFamily = FontFamily.Monospace)
-                                }
+                                Button(onClick = { currentScreen = "settings" }, colors = ButtonDefaults.buttonColors(containerColor = Color.Green)) { Text("CONFIGURE AI PROVIDER", color = Color.Black, fontFamily = FontFamily.Monospace) }
                             }
                         } else {
-                            SmartNotesScreen(apiKey, modelName, noteDao) { currentScreen = "settings" }
+                            SmartNotesScreen(apiKey, modelName, noteDao, settingsManager) { currentScreen = "settings" }
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-                            Button(
-                                onClick = { currentScreen = "home" }, 
-                                modifier = Modifier.padding(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                            ) { Text("<- RETURN", color = Color.Green, fontFamily = FontFamily.Monospace) }
+                            Button(onClick = { currentScreen = "home" }, modifier = Modifier.padding(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("<- RETURN", color = Color.Green, fontFamily = FontFamily.Monospace) }
                             SettingsScreen()
                         }
                     }
@@ -128,9 +120,7 @@ suspend fun fetchAiResponse(prompt: String, apiKey: String, modelName: String): 
         } else {
             return@withContext json.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
         }
-    } catch (e: Exception) {
-        return@withContext "NETWORK ERROR: ${e.message}"
-    }
+    } catch (e: Exception) { return@withContext "NETWORK ERROR: ${e.message}" }
 }
 
 fun formatMarkdown(text: String): AnnotatedString {
@@ -156,20 +146,55 @@ fun CyberpunkTheme(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpenSettings: () -> Unit) {
+fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, settingsManager: SettingsManager, onOpenSettings: () -> Unit) {
     var note by remember { mutableStateOf("") }
     var aiResponse by remember { mutableStateOf("> AI Assistant standing by...") }
+    var isRecording by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val savedNotes by noteDao.getAllNotes().collectAsState(initial = emptyList())
+    val offlineMode by settingsManager.offlineModeFlow.collectAsState(initial = false)
     val scrollState = rememberScrollState()
-    
+
     val whisperEngine = remember { WhisperEngine(context).apply { initializeBrain() } }
 
     val speechRecognizerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == ComponentActivity.RESULT_OK) {
             val spokenText = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.get(0) ?: ""
             note = if (note.isEmpty()) spokenText else "$note $spokenText"
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (!isGranted) aiResponse = "> ERROR: MICROPHONE PERMISSION REQUIRED FOR OFFLINE AI."
+    }
+
+    fun startOfflineRecording() {
+        scope.launch(Dispatchers.IO) {
+            isRecording = true
+            aiResponse = "> [LOCAL AI]: RECORDING HARDWARE MIC... SPEAK NOW (5s)"
+            try {
+                val bufferSize = AudioRecord.getMinBufferSize(16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, 16000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+                    recorder.startRecording()
+                    val audioData = ByteArray(16000 * 2 * 5) // 5 seconds of 16kHz 16-bit PCM
+                    var offset = 0
+                    while (offset < audioData.size) {
+                        val read = recorder.read(audioData, offset, audioData.size - offset)
+                        if (read < 0) break
+                        offset += read
+                    }
+                    recorder.stop()
+                    recorder.release()
+                    aiResponse = "> [LOCAL AI]: PROCESSING RAW AUDIO OFFLINE..."
+                    val transcription = whisperEngine.transcribeOffline(audioData)
+                    note = if (note.isEmpty()) transcription else "$note $transcription"
+                    aiResponse = "> [LOCAL AI]: AUDIO PROCESSED SECURELY."
+                }
+            } catch (e: Exception) {
+                aiResponse = "> [LOCAL AI]: ENGINE ERROR -> ${e.message}"
+            } finally { isRecording = false }
         }
     }
 
@@ -193,12 +218,22 @@ fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpen
         Spacer(modifier = Modifier.height(8.dp))
 
         Button(
-            onClick = { speechRecognizerLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault()) }) },
-            modifier = Modifier.fillMaxWidth().shadow(15.dp, spotColor = Color(0xFFFF00FF)), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF00FF))
+            onClick = {
+                if (isRecording) return@Button
+                if (offlineMode) {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                        startOfflineRecording()
+                    } else { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+                } else {
+                    speechRecognizerLauncher.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply { putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM); putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault()) })
+                }
+            },
+            modifier = Modifier.fillMaxWidth().shadow(15.dp, spotColor = if (isRecording) Color.Red else Color(0xFFFF00FF)), 
+            colors = ButtonDefaults.buttonColors(containerColor = if (isRecording) Color.Red else Color(0xFFFF00FF))
         ) {
             Icon(Icons.Filled.Mic, contentDescription = "Voice", tint = Color.Black)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("INITIALIZE VOICE CAPTURE", color = Color.Black, fontFamily = FontFamily.Monospace)
+            Text(if (isRecording) "RECORDING IN PROGRESS..." else "INITIALIZE VOICE CAPTURE", color = Color.Black, fontFamily = FontFamily.Monospace)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -210,12 +245,7 @@ fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpen
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        OutlinedButton(
-            onClick = { scope.launch { aiResponse = fetchAiResponse("Act as an AI assistant. Answer this query:\n$note", apiKey, modelName) } }, 
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color.Green), 
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)
-        ) { 
+        OutlinedButton(onClick = { scope.launch { aiResponse = fetchAiResponse("Act as an AI assistant. Answer this query:\n$note", apiKey, modelName) } }, modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, Color.Green), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Green)) { 
             Icon(Icons.Filled.Search, contentDescription = "Query", tint = Color.Green)
             Spacer(modifier = Modifier.width(8.dp))
             Text("QUERY AI ARCHIVES", fontFamily = FontFamily.Monospace) 
@@ -223,39 +253,28 @@ fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpen
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF050505)).border(1.dp, Color(0xFF00FFCC)).padding(16.dp)) {
-            Text(formatMarkdown(aiResponse), color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace)
-        }
+        Box(modifier = Modifier.fillMaxWidth().background(Color(0xFF050505)).border(1.dp, Color(0xFF00FFCC)).padding(16.dp)) { Text(formatMarkdown(aiResponse), color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace) }
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        Button(
-            onClick = { scope.launch { if (note.isNotBlank()) { noteDao.insertNote(Note(originalText = note, aiResponse = aiResponse)); note = ""; aiResponse = "> DATA SECURED IN LOCAL VAULT." } } },
-            modifier = Modifier.fillMaxWidth().shadow(10.dp, spotColor = Color(0xFF00FFCC)), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC))
-        ) { Text("ENCRYPT & SAVE TO VAULT", color = Color.Black, fontFamily = FontFamily.Monospace) }
+        Button(onClick = { scope.launch { if (note.isNotBlank()) { noteDao.insertNote(Note(originalText = note, aiResponse = aiResponse)); note = ""; aiResponse = "> DATA SECURED IN LOCAL VAULT." } } }, modifier = Modifier.fillMaxWidth().shadow(10.dp, spotColor = Color(0xFF00FFCC)), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FFCC))) { Text("ENCRYPT & SAVE TO VAULT", color = Color.Black, fontFamily = FontFamily.Monospace) }
 
         Spacer(modifier = Modifier.height(24.dp))
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("> SECURE_VAULT", style = MaterialTheme.typography.headlineSmall, color = Color.Green)
-            
-            Button(
-                onClick = {
-                    var exportText = "SMART NOTES EXPORT\n========================\n\n"
-                    savedNotes.forEach { savedNote -> exportText += "Original: ${savedNote.originalText}\nAI: ${savedNote.aiResponse}\n\n" }
-                    val sendIntent = Intent().apply { action = Intent.ACTION_SEND; putExtra(Intent.EXTRA_TEXT, exportText); type = "text/plain" }
-                    context.startActivity(Intent.createChooser(sendIntent, "Export Vault to..."))
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-            ) { 
+            Button(onClick = {
+                var exportText = "SMART NOTES EXPORT\n========================\n\n"
+                savedNotes.forEach { savedNote -> exportText += "Original: ${savedNote.originalText}\nAI: ${savedNote.aiResponse}\n\n" }
+                val sendIntent = Intent().apply { action = Intent.ACTION_SEND; putExtra(Intent.EXTRA_TEXT, exportText); type = "text/plain" }
+                context.startActivity(Intent.createChooser(sendIntent, "Export Vault to..."))
+            }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { 
                 Icon(Icons.Filled.Share, contentDescription = "Export", tint = Color.Green)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("EXPORT", color = Color.Green, fontFamily = FontFamily.Monospace) 
             }
         }
-
         Spacer(modifier = Modifier.height(8.dp))
-
         savedNotes.forEach { savedNote -> NoteCard(savedNote) }
         Spacer(modifier = Modifier.height(32.dp))
     }
@@ -264,21 +283,15 @@ fun SmartNotesScreen(apiKey: String, modelName: String, noteDao: NoteDao, onOpen
 @Composable
 fun NoteCard(savedNote: Note) {
     var expanded by remember { mutableStateOf(false) }
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp)).clickable { expanded = !expanded }.animateContentSize(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A))
-    ) {
+    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp)).clickable { expanded = !expanded }.animateContentSize(), colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0A0A))) {
         Column(modifier = Modifier.padding(16.dp)) {
             val dateString = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(savedNote.timestamp))
             Text("[$dateString]", color = Color.Gray, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelSmall)
             Spacer(modifier = Modifier.height(4.dp))
             Text(savedNote.originalText, color = Color.White, fontFamily = FontFamily.Monospace, maxLines = if (expanded) Int.MAX_VALUE else 1)
             Spacer(modifier = Modifier.height(4.dp))
-            if (expanded) {
-                Text(formatMarkdown(savedNote.aiResponse), color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            } else {
-                Text("> TAP TO EXPAND DATABLOCK...", color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
-            }
+            if (expanded) { Text(formatMarkdown(savedNote.aiResponse), color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) } 
+            else { Text("> TAP TO EXPAND DATABLOCK...", color = Color(0xFF00FFCC), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall) }
         }
     }
 }
