@@ -17,8 +17,8 @@ class SettingsManager(private val context: Context) {
         val OFFLINE_MODE = booleanPreferencesKey("offline_mode")
     }
 
-    val apiKeyFlow: Flow<String?> = context.dataStore.data.map { it[API_KEY] }
-    val modelNameFlow: Flow<String?> = context.dataStore.data.map { it[MODEL_NAME] }
+    val apiKeyFlow: Flow<String> = context.dataStore.data.map { it[API_KEY] ?: "" }
+    val modelNameFlow: Flow<String> = context.dataStore.data.map { it[MODEL_NAME] ?: "gemini-2.5-flash" }
     val offlineModeFlow: Flow<Boolean> = context.dataStore.data.map { it[OFFLINE_MODE] ?: false }
 
     suspend fun saveApiKey(key: String) { context.dataStore.edit { it[API_KEY] = key } }
