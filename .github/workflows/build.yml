@@ -24,6 +24,13 @@ jobs:
       with:
         gradle-version: '8.4'
 
+    - name: Download Offline Whisper AI Brain
+      run: |
+        echo "> INITIALIZING AI WEIGHT DOWNLOAD..."
+        mkdir -p app/src/main/assets
+        curl -L https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin -o app/src/main/assets/ggml-tiny.en.bin
+        echo "> AI BRAIN SECURED IN ASSETS."
+
     - name: Build Release APK
       run: gradle assembleRelease
 
