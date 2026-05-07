@@ -109,6 +109,18 @@ fun SettingsScreen() {
             Icon(Icons.Filled.Favorite, contentDescription = "Donate", tint = Color.Black)
             Spacer(modifier = Modifier.width(8.dp))
             Text("SUPPORT FOSS DEVELOPER", color = Color.Black, fontFamily = FontFamily.Monospace)
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().border(1.dp, Color.DarkGray, RoundedCornerShape(4.dp)).padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("LOCAL VAULT", color = Color.White, fontFamily = FontFamily.Monospace)
+                    Text("Export notes offline", color = Color.Gray, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+                }
+                BackupVaultButton("=== SMART NOTES VAULT BACKUP ===\n\n(Note database hook coming in v2.1)")
         }
     }
 }
