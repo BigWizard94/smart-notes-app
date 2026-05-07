@@ -1,0 +1,24 @@
+Categories:
+  - Productivity
+  - Writing
+License: GPL-3.0-only
+AuthorName: Chase Lucas
+SourceCode: https://github.com/BigWizard94/smart-notes-app
+IssueTracker: https://github.com/BigWizard94/smart-notes-app/issues
+
+Summary: AI-powered decentralized voice and text notes.
+Description: |-
+    Smart Notes is a privacy-focused note-taking application designed for 
+    mobile-first users. It features a Bring Your Own Key (BYOK) model for 
+    AI integration and secure local storage.
+
+RepoType: git
+Repo: https://github.com/BigWizard94/smart-notes-app
+
+Builds:
+  - versionName: "2.0"
+    versionCode: 2
+    commit: main
+    subdir: app
+    gradle:
+      - yes

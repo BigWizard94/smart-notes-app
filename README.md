@@ -1,33 +1,31 @@
-# 📝 Smart Notes by Bigwizard Media
+# Smart Notes
+**A lightning-fast, privacy-focused AI note-taking app for Android.**
 
-An ultra-fast, AI-powered Android notes application. 
+Smart Notes is built for creators and developers who want the power of AI without sacrificing data ownership. Featuring a "Bring Your Own Key" (BYOK) architecture, all your notes stay in a secure, [...]
 
-**Smart Notes** combines secure local vault storage with cutting-edge artificial intelligence. It allows you to instantly capture your thoughts, organize action items, and generate intelligent summaries on the fly.
+## ✨ Features
+* **Local-First Persistence:** Your data never leaves your device unless you want it to.
+* **Universal AI Integration:** Plug in any OpenAI-compatible API key for summarization and entity extraction.
+* **Open Source & FOSS:** 100% transparent and community-driven.
+* **Built on Mobile:** Proudly engineered and signed strictly from an Android device.
 
-🚀 **Fun Fact:** This entire application—from the core codebase to the cryptographic signing and CI/CD deployment pipeline—was engineered, compiled, and shipped **100% from a mobile device**, completely bypassing traditional desktop environments.
+## 📥 Download
+You can download the latest signed APK from the official releases page:
+* **[Latest Release](https://github.com/BigWizard94/smart-notes-app/releases/latest)**
 
-## ✨ Core Features
+*Pending inclusion on F-Droid and IzzyOnDroid.*
 
-* **Universal AI Brain (BYOK):** Engineered using the universal OpenAI API standard. You are not locked into one ecosystem. Plug in *any* OpenAI-compatible API key and model name to power your notes!
-* **The Vault:** Secure, local persistence for all your critical data.
-* **Cloud Sync:** Seamless state management to ensure nothing is ever lost.
-* **Automated Cloud Builds:** Fully automated GitHub Actions pipeline that builds and cryptographically signs release-ready APKs.
+## 🔒 Privacy & Security
+🔐 **[View our Privacy & Security Policy](PRIVACY.md)**
 
-## 📲 How to Install
+Smart Notes is built with a "Privacy-First" philosophy. We do not collect, store, or transmit any data about your usage. All notes and recordings are stored locally on your device.
 
-You don't need an app store to get the latest version. You can install it directly to your Android device in seconds:
-
-1. Navigate to the [Releases Page](../../releases/latest).
-2. Download the `SmartNotes-v1.0.apk` file under the **Assets** section.
-3. Tap the downloaded file to install (if prompted, toggle "Allow from this source" in your Android settings).
-4. Launch the app, enter your preferred OpenAI-compatible API base URL, key, and model name in the settings, and wake up the AI.
-
-## 🛠️ The Tech Stack
-
-* **Language:** Kotlin / XML
-* **AI Integration:** Universal OpenAI-Compatible REST Architecture
-* **CI/CD:** GitHub Actions (Ubuntu / Gradle 8.4)
-* **Build Environment:** Android Mobile Terminal
+## 🛠 Development
+This project is a mobile-first production by Bigwizard Media.
+* **Environment:** Developed using Kotlin/XML on Android.
+* **License:** See the [LICENSE](https://github.com/BigWizard94/smart-notes-app/blob/main/LICENSE) file for details.
+* **Contributions:** FOSS supporters are welcome to open issues or pull requests.
 
 ---
-*Developed and maintained by Chase Lucas | Bigwizard Media*
+**Powered by Bigwizard Media**
+*Technology should stay open, accessible, and in our hands.*
