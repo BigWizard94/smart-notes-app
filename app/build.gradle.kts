@@ -8,23 +8,22 @@ android {
     namespace = "com.smartnotes"
     compileSdk = 34
 
-    defaultConfig {
-        applicationId = "com.smartnotes"
-        minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "2.0-cyber"
+    defaultConfig {  
+        applicationId = "com.smartnotes"  
+        minSdk = 26  
+        targetSdk = 34  
+        versionCode = 2  // Incremented to represent Version 2
+        versionName = "2.0.0.0"  // Matches your true release name
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-            }
-        }
+        vectorDrawables { 
+            useSupportLibrary = true 
+        }  
+        externalNativeBuild {  
+            cmake {  
+                cppFlags += "-std=c++17"  
+            }  
+        }  
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
